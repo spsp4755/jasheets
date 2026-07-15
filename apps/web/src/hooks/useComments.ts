@@ -46,8 +46,8 @@ interface UseCommentsReturn {
 
 export function useComments({
   sheetId,
-  apiUrl = 'http://localhost:4000/api',
-  wsUrl = 'http://localhost:4000/comments',
+  apiUrl = '/api',
+  wsUrl = '/comments',
 }: UseCommentsOptions): UseCommentsReturn {
   const [comments, setComments] = useState<Comment[]>([]);
   const [isLoading, setIsLoading] = useState(false);

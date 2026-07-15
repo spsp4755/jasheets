@@ -60,7 +60,7 @@ export function useCollaboration({
   spreadsheetId,
   userId,
   userName,
-  wsUrl = 'http://localhost:4000/collaboration',
+  wsUrl = '/collaboration',
   onCellUpdate,
   onCellsUpdate,
   onChatMessage,

@@ -1,0 +1,111 @@
+# Keycloak — 폐쇄망 내부 SSO (OIDC)
+# 기존 jasheets PostgreSQL 인스턴스에 'keycloak' DB를 만들어 사용 (initContainer가 자동 생성)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: jasheets-keycloak-secret
+  namespace: jasheets
+type: Opaque
+stringData:
+  # 배포 전 반드시 변경하세요 — Keycloak 관리 콘솔 로그인 계정
+  KEYCLOAK_ADMIN: admin
+  KEYCLOAK_ADMIN_PASSWORD: change-me-in-production
+  # 10-postgres.yaml의 POSTGRES_PASSWORD와 동일하게
+  KC_DB_PASSWORD: change-me-in-production
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: jasheets
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: keycloak }
+  template:
+    metadata:
+      labels: { app: keycloak }
+    spec:
+      initContainers:
+        # keycloak 데이터베이스가 없으면 생성
+        - name: create-db
+          image: postgres:16-alpine
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h postgres -U jasheets; do sleep 2; done
+              psql -h postgres -U jasheets -d jasheets -tc "SELECT 1 FROM pg_database WHERE datname='keycloak'" | grep -q 1 \
+                || psql -h postgres -U jasheets -d jasheets -c "CREATE DATABASE keycloak"
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef: { name: jasheets-db-secret, key: POSTGRES_PASSWORD }
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:26.0
+          imagePullPolicy: IfNotPresent
+          args: ["start"]
+          env:
+            - name: KEYCLOAK_ADMIN
+              valueFrom:
+                secretKeyRef: { name: jasheets-keycloak-secret, key: KEYCLOAK_ADMIN }
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: jasheets-keycloak-secret, key: KEYCLOAK_ADMIN_PASSWORD }
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL
+              value: jdbc:postgresql://postgres:5432/keycloak
+            - name: KC_DB_USERNAME
+              value: jasheets
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: jasheets-keycloak-secret, key: KC_DB_PASSWORD }
+            # 브라우저가 접근하는 공개 주소 — Ingress 호스트에 맞게 변경
+            - name: KC_HOSTNAME
+              value: http://keycloak.jasheets.local
+            # 폐쇄망: TLS 미사용 시 프록시 뒤 HTTP 허용
+            - name: KC_PROXY_HEADERS
+              value: xforwarded
+            - name: KC_HTTP_ENABLED
+              value: "true"
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet: { path: /realms/master, port: 8080 }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 500m, memory: 512Mi }
+            limits: { memory: 1.5Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: jasheets
+spec:
+  selector: { app: keycloak }
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+# Keycloak 전용 Ingress 호스트 (브라우저가 로그인 페이지에 접근해야 함)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: keycloak
+  namespace: jasheets
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "128k" # Keycloak 응답 헤더가 큼
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: keycloak.jasheets.local # 폐쇄망 내부 DNS에 맞게 변경
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: keycloak, port: { number: 8080 } }

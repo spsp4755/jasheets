@@ -10,7 +10,7 @@ export default function GlobalHeader() {
   const pathname = usePathname();
 
   // Don't render on login page, admin pages, or if not authenticated
-  if (!user || pathname === '/login' || pathname.startsWith('/admin')) {
+  if (!user || pathname === '/login' || pathname.startsWith('/admin') || pathname.startsWith('/spreadsheet')) { // 시트 편집 화면은 Google Sheets처럼 자체 메뉴바만 사용
     return null;
   }
 
@@ -25,7 +25,7 @@ export default function GlobalHeader() {
       
       <nav className={styles.nav}>
         <Link href="/dashboard" className={styles.navLink}>
-          📊 Dashboard
+          📊 대시보드
         </Link>
         {user.isAdmin && (
           <Link href="/admin" className={styles.navLink}>
@@ -41,7 +41,7 @@ export default function GlobalHeader() {
           </div>
           <span className={styles.userName}>{user.name || user.email}</span>
           <button onClick={logout} className={styles.logoutButton}>
-            Logout
+            로그아웃
           </button>
         </div>
       </div>

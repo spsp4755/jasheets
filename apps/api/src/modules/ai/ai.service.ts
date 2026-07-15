@@ -51,9 +51,11 @@ export interface DataSummary {
 export class AIService {
   private readonly logger = new Logger(AIService.name);
   private readonly openaiApiKey: string | undefined;
+  private readonly aiBaseUrl: string | undefined; // ponytail: 폐쇄망 — 내부 OpenAI 호환 엔드포인트(vLLM/Ollama)만 허용, 미설정 시 AI 비활성
 
   constructor(private readonly configService: ConfigService) {
     this.openaiApiKey = this.configService.get<string>('OPENAI_API_KEY');
+    this.aiBaseUrl = this.configService.get<string>('AI_BASE_URL');
   }
 
   // Natural language to formula conversion
@@ -65,7 +67,7 @@ export class AIService {
     }
 
     // If OpenAI API key is available, use it
-    if (this.openaiApiKey) {
+    if (this.aiBaseUrl) {
       return this.generateFormulaWithLLM(prompt, context);
     }
 
@@ -408,7 +410,7 @@ export class AIService {
   // Generate formula using LLM (OpenAI)
   private async generateFormulaWithLLM(prompt: string, context: FormulaContext): Promise<FormulaResult> {
     try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      const response = await fetch(`${this.aiBaseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -497,9 +499,9 @@ Respond in JSON format:
       }
     }
 
-    if (this.openaiApiKey) {
+    if (this.aiBaseUrl) {
       try {
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        const response = await fetch(`${this.aiBaseUrl}/chat/completions`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

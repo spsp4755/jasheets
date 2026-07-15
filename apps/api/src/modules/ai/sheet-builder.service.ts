@@ -216,9 +216,11 @@ const SHEET_TEMPLATES: Record<string, SheetDSL> = {
 export class SheetBuilderService {
     private readonly logger = new Logger(SheetBuilderService.name);
     private readonly openaiApiKey: string | undefined;
+    private readonly aiBaseUrl: string | undefined;
 
     constructor(private readonly configService: ConfigService) {
         this.openaiApiKey = this.configService.get<string>('OPENAI_API_KEY');
+    this.aiBaseUrl = this.configService.get<string>('AI_BASE_URL');
     }
 
     /**
@@ -234,7 +236,7 @@ export class SheetBuilderService {
         }
 
         // If OpenAI is available, use LLM generation
-        if (this.openaiApiKey) {
+        if (this.aiBaseUrl) {
             return this.generateWithLLM(prompt);
         }
 
@@ -327,7 +329,7 @@ export class SheetBuilderService {
      */
     private async generateWithLLM(prompt: string): Promise<SheetBuildResult> {
         try {
-            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            const response = await fetch(`${this.aiBaseUrl}/chat/completions`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

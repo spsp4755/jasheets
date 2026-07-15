@@ -40,7 +40,7 @@ export const TemplateGallery = () => {
 
     return (
         <div className="mb-8">
-            <h2 className="text-xl font-semibold mb-3">Start from a Template</h2>
+            <h2 className="text-xl font-semibold mb-3">템플릿으로 시작하기</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                 {templates.map(tpl => (
                     <div 
@@ -50,7 +50,7 @@ export const TemplateGallery = () => {
                     >
                         <h3 className="font-bold text-gray-800 truncate">{tpl.name}</h3>
                         <p className="text-xs text-gray-500 mt-1 line-clamp-2">{tpl.description}</p>
-                        <div className="mt-3 text-xs text-blue-600 font-medium">Use Template &rarr;</div>
+                        <div className="mt-3 text-xs text-blue-600 font-medium">템플릿 사용 &rarr;</div>
                     </div>
                 ))}
             </div>

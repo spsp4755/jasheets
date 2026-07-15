@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 export const api = {
   auth: {
@@ -110,6 +110,19 @@ export const api = {
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error('Failed to update spreadsheet');
+      return res.json();
+    },
+    addSheet: async (id: string, name: string) => {
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`${API_URL}/sheets/${id}/sheets`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) throw new Error('Failed to add sheet');
       return res.json();
     },
     copy: async (id: string) => {

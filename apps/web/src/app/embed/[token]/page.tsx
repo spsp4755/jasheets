@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import EmbedSpreadsheet from '@/components/embed/EmbedSpreadsheet';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 interface EmbedOptions {
     showToolbar: boolean;

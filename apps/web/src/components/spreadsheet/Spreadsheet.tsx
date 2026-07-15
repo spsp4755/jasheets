@@ -369,6 +369,52 @@ export default function Spreadsheet({ initialData = {}, initialCharts = [], onDa
     }
   }, [data, activeSheetId, charts]);
 
+  // 자동 저장: 데이터 변경 후 2초 디바운스 (토스트 없이 조용히 저장)
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const skipNextAutoSave = useRef(true); // 시트 로드 직후의 data 변경은 저장 대상이 아님
+  const lastSavedKeys = useRef<Set<string>>(new Set()); // 지워진 셀(undo/delete)을 서버에서도 지우기 위한 추적
+  useEffect(() => { skipNextAutoSave.current = true; }, [activeSheetId]);
+  useEffect(() => {
+    const collectKeys = () => {
+      const keys = new Set<string>();
+      Object.keys(data).forEach(r => Object.keys(data[Number(r)]).forEach(c => {
+        if (data[Number(r)][Number(c)]) keys.add(`${r}:${c}`);
+      }));
+      return keys;
+    };
+    if (skipNextAutoSave.current) {
+      skipNextAutoSave.current = false;
+      lastSavedKeys.current = collectKeys();
+      return;
+    }
+    if (!activeSheetId) return;
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(() => {
+      const updates: any[] = [];
+      const currentKeys = collectKeys();
+      Object.keys(data).forEach(r => {
+        const row = Number(r);
+        Object.keys(data[row]).forEach(c => {
+          const col = Number(c);
+          const cell = data[row][col];
+          if (cell) updates.push({ row, col, value: cell.value, formula: cell.formula, format: cell.style });
+        });
+      });
+      // 사라진 셀은 value:null로 보내 서버에서 삭제
+      lastSavedKeys.current.forEach(key => {
+        if (!currentKeys.has(key)) {
+          const [row, col] = key.split(':').map(Number);
+          updates.push({ row, col, value: null });
+        }
+      });
+      lastSavedKeys.current = currentKeys;
+      if (updates.length > 0) {
+        api.spreadsheets.updateCells(activeSheetId, updates).catch(e => console.error('[autosave]', e));
+      }
+    }, 2000);
+    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
+  }, [data, activeSheetId]);
+
   // Keyboard shortcut for save
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1082,6 +1128,7 @@ export default function Spreadsheet({ initialData = {}, initialCharts = [], onDa
           }
         }}
         onSave={handleSave}
+        onShare={handleShare}
         title={sheetTitle}
         onTitleChange={handleTitleChange}
         onPrint={() => window.print()}

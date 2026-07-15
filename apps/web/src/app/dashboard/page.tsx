@@ -22,8 +22,8 @@ export default function DashboardPage() {
         <NoticeBanner />
         
         <div className="mb-8">
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">My Workspace</h1>
-            <p className="text-gray-500">Manage your spreadsheets, templates, and automations.</p>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">내 워크스페이스</h1>
+            <p className="text-gray-500">스프레드시트, 템플릿, 자동화를 관리하세요.</p>
         </div>
 
         {/* Tab Navigation */}
@@ -36,7 +36,7 @@ export default function DashboardPage() {
                 : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
             }`}
           >
-            📊 Spreadsheets
+            📊 스프레드시트
           </button>
           <button
             onClick={() => setActiveTab('workflows')}
@@ -46,7 +46,7 @@ export default function DashboardPage() {
                 : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
             }`}
           >
-            ⚡ Workflows
+            ⚡ 워크플로우
           </button>
         </div>
 

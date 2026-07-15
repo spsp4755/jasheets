@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/co
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -108,6 +109,88 @@ export class AuthService {
     }
 
     return user;
+  }
+
+  // --- Keycloak OIDC (폐쇄망 내부 SSO) -------------------------------------
+  // 표준 인가 코드 플로우를 fetch 두 번으로 직접 구현 — passport 등 추가 의존성 없음.
+  // KEYCLOAK_URL: 브라우저가 접근하는 주소 (예: http://keycloak.local)
+  // KEYCLOAK_INTERNAL_URL: 백엔드→Keycloak 내부 주소 (미설정 시 KEYCLOAK_URL 사용)
+
+  private get kc() {
+    const url = this.configService.get<string>('KEYCLOAK_URL');
+    const realm = this.configService.get<string>('KEYCLOAK_REALM');
+    const clientId = this.configService.get<string>('KEYCLOAK_CLIENT_ID');
+    const clientSecret = this.configService.get<string>('KEYCLOAK_CLIENT_SECRET');
+    const appUrl = this.configService.get<string>('PUBLIC_APP_URL') || 'http://localhost:3000';
+    const internalUrl = this.configService.get<string>('KEYCLOAK_INTERNAL_URL') || url;
+    return { url, realm, clientId, clientSecret, appUrl, internalUrl };
+  }
+
+  isKeycloakEnabled(): boolean {
+    const { url, realm, clientId, clientSecret } = this.kc;
+    return !!(url && realm && clientId && clientSecret);
+  }
+
+  getKeycloakAuthUrl(): string {
+    const { url, realm, clientId, appUrl } = this.kc;
+    // state: 5분짜리 서명 토큰으로 CSRF 방지 (서버 세션 불필요)
+    const state = this.jwtService.sign({ kc: true }, { expiresIn: '5m' });
+    const params = new URLSearchParams({
+      client_id: clientId!,
+      response_type: 'code',
+      scope: 'openid email profile',
+      redirect_uri: `${appUrl}/api/auth/keycloak/callback`,
+      state,
+    });
+    return `${url}/realms/${realm}/protocol/openid-connect/auth?${params.toString()}`;
+  }
+
+  async loginWithKeycloak(code: string, state: string): Promise<TokenResponse> {
+    try {
+      const decoded = this.jwtService.verify(state);
+      if (!decoded?.kc) throw new Error('not a kc state');
+    } catch {
+      throw new UnauthorizedException('Invalid state parameter');
+    }
+
+    const { realm, clientId, clientSecret, appUrl, internalUrl } = this.kc;
+    const tokenRes = await fetch(`${internalUrl}/realms/${realm}/protocol/openid-connect/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: `${appUrl}/api/auth/keycloak/callback`,
+        client_id: clientId!,
+        client_secret: clientSecret!,
+      }),
+    });
+    if (!tokenRes.ok) {
+      throw new UnauthorizedException(`Keycloak token exchange failed: ${await tokenRes.text()}`);
+    }
+    const kcTokens = await tokenRes.json();
+
+    const userinfoRes = await fetch(`${internalUrl}/realms/${realm}/protocol/openid-connect/userinfo`, {
+      headers: { Authorization: `Bearer ${kcTokens.access_token}` },
+    });
+    if (!userinfoRes.ok) {
+      throw new UnauthorizedException('Keycloak userinfo request failed');
+    }
+    const info = await userinfoRes.json();
+
+    const email = info.email || `${info.preferred_username}@keycloak.local`;
+    let user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      // SSO 사용자는 로컬 비밀번호를 쓰지 않음 — 임의 값으로 채움
+      user = await this.prisma.user.create({
+        data: {
+          email,
+          name: info.name || info.preferred_username || email,
+          password: await bcrypt.hash(randomUUID(), 10),
+        },
+      });
+    }
+    return this.generateTokens(user);
   }
 
   private async generateTokens(user: { id: string; email: string; name: string | null; avatar: string | null; isAdmin: boolean }): Promise<TokenResponse> {

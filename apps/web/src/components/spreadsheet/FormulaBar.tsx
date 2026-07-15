@@ -63,13 +63,8 @@ export default function FormulaBar({
         {cellRef}
       </div>
       <div className={styles.separator} />
-      <div className={styles.functionIcon}>
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-          <path d="M4.5 6.75a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5h-.75v9h.75a.75.75 0 0 1 0 1.5h-1.5a.75.75 0 0 1-.75-.75v-10.5z"/>
-          <path d="M9 10.5a.75.75 0 0 1 .75-.75h5.5a.75.75 0 0 1 0 1.5h-5.5a.75.75 0 0 1-.75-.75z"/>
-          <path d="M9.75 13.5a.75.75 0 0 0 0 1.5h3.5a.75.75 0 0 0 0-1.5h-3.5z"/>
-          <path d="M18 6h1.5a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75H18a.75.75 0 0 1 0-1.5h.75v-9H18a.75.75 0 0 1 0-1.5z"/>
-        </svg>
+      <div className={styles.functionIcon} title="함수">
+        <span style={{ fontStyle: 'italic', fontFamily: 'Georgia, serif', fontSize: 14 }}>fx</span>
       </div>
       <input
         ref={inputRef}
@@ -80,7 +75,7 @@ export default function FormulaBar({
         onKeyDown={handleKeyDown}
         onBlur={handleBlur}
         onClick={onEdit}
-        placeholder="Enter value or formula"
+        placeholder=""
         readOnly={!isEditing}
       />
     </div>

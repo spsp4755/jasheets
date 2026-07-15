@@ -39,7 +39,7 @@ export default function SheetBuilderDialog({
     isOpen,
     onClose,
     onApply,
-    apiUrl = 'http://localhost:4000/api',
+    apiUrl = '/api',
 }: SheetBuilderDialogProps) {
     const [prompt, setPrompt] = useState('');
     const [templates, setTemplates] = useState<SheetTemplate[]>([]);

@@ -32,6 +32,7 @@ interface MenuBarProps {
   onEmail: () => void;
   onSave?: () => void;
   onOpenFile?: () => void;
+  onShare?: () => void;
   title?: string;
   onTitleChange?: (newTitle: string) => void;
   // New props for enhanced functionality
@@ -90,6 +91,7 @@ export default function MenuBar({
   onEmail,
   onSave,
   onOpenFile,
+  onShare,
   title,
   onTitleChange,
   onInsertChart,
@@ -159,21 +161,22 @@ export default function MenuBar({
 
   return (
     <div className={styles.container} ref={menuRef}>
-      <div className={styles.leftSection}>
-        <Link href="/dashboard" className={styles.logo} title="대시보드로 이동">
-          <svg viewBox="0 0 24 24" width="24" height="24" fill="#0f9d58">
-            <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
-          </svg>
-        </Link>
-        <div className={styles.titleContainer}>
-          <input
-            type="text"
-            value={title || 'Untitled Spreadsheet'}
-            onChange={(e) => onTitleChange?.(e.target.value)}
-            className={styles.titleInput}
-            placeholder="제목 없는 스프레드시트"
-          />
-        </div>
+      <Link href="/dashboard" className={styles.logo} title="대시보드로 이동">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="#0f9d58">
+          <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
+        </svg>
+      </Link>
+
+      <div className={styles.headerColumn}>
+      <div className={styles.titleRow}>
+        <input
+          type="text"
+          value={title || '제목 없는 스프레드시트'}
+          onChange={(e) => onTitleChange?.(e.target.value)}
+          className={styles.titleInput}
+          placeholder="제목 없는 스프레드시트"
+        />
+        <span className={styles.star} title="즐겨찾기">☆</span>
       </div>
 
       <div className={styles.menus}>
@@ -234,30 +237,6 @@ export default function MenuBar({
           )}
         </div>
 
-        {/* INSERT MENU */}
-        <div className={styles.menuWrapper}>
-          <button
-            className={`${styles.menuButton} ${activeMenu === 'insert' ? styles.active : ''}`}
-            onClick={() => handleMenuClick('insert')}
-            onMouseEnter={() => handleMouseEnter('insert')}
-          >
-            삽입
-          </button>
-          {activeMenu === 'insert' && (
-            <div className={styles.dropdown}>
-              <MenuItem label="행 (위쪽)" onClick={onInsertRow} />
-              <MenuItem label="행 (아래쪽)" onClick={onInsertRow} />
-              <MenuItem label="열 (왼쪽)" onClick={onInsertCol} />
-              <MenuItem label="열 (오른쪽)" onClick={onInsertCol} />
-              <Separator />
-              <MenuItem label="차트" onClick={onInsertChart} />
-              <MenuItem label="피벗 테이블" onClick={onInsertPivot} />
-              <MenuItem label="이미지" onClick={() => alert('이미지 삽입은 아직 지원하지 않습니다.')} />
-              <MenuItem label="링크" onClick={onInsertLink} shortcut="Ctrl+K" />
-            </div>
-          )}
-        </div>
-
         {/* VIEW MENU */}
         <div className={styles.menuWrapper}>
           <button
@@ -287,6 +266,30 @@ export default function MenuBar({
                   <MenuItem label="200%" onClick={() => onZoomChange?.(200)} />
                 </div>
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* INSERT MENU */}
+        <div className={styles.menuWrapper}>
+          <button
+            className={`${styles.menuButton} ${activeMenu === 'insert' ? styles.active : ''}`}
+            onClick={() => handleMenuClick('insert')}
+            onMouseEnter={() => handleMouseEnter('insert')}
+          >
+            삽입
+          </button>
+          {activeMenu === 'insert' && (
+            <div className={styles.dropdown}>
+              <MenuItem label="행 (위쪽)" onClick={onInsertRow} />
+              <MenuItem label="행 (아래쪽)" onClick={onInsertRow} />
+              <MenuItem label="열 (왼쪽)" onClick={onInsertCol} />
+              <MenuItem label="열 (오른쪽)" onClick={onInsertCol} />
+              <Separator />
+              <MenuItem label="차트" onClick={onInsertChart} />
+              <MenuItem label="피벗 테이블" onClick={onInsertPivot} />
+              <MenuItem label="이미지" onClick={() => alert('이미지 삽입은 아직 지원하지 않습니다.')} />
+              <MenuItem label="링크" onClick={onInsertLink} shortcut="Ctrl+K" />
             </div>
           )}
         </div>
@@ -398,6 +401,16 @@ export default function MenuBar({
           )}
         </div>
 
+      </div>
+      </div>
+
+      <div className={styles.rightSection}>
+        <button className={styles.shareButton} onClick={onShare}>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M12 17c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6-7h-1V8c0-2.76-2.24-5-5-5S7 5.24 7 8v2H6c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-8c0-1.1-.9-2-2-2zM9 8c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9V8z" />
+          </svg>
+          공유
+        </button>
       </div>
     </div>
   );

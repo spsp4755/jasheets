@@ -45,7 +45,7 @@ export default function UDFEditorDialog({
     onSave,
     spreadsheetId,
     existingUDF,
-    apiUrl = 'http://localhost:4000/api',
+    apiUrl = '/api',
 }: UDFEditorDialogProps) {
     const [udf, setUdf] = useState<UDFData>({
         name: '',

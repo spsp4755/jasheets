@@ -61,7 +61,7 @@ export default function ProfilerPanel({
     data,
     headers,
     sheetName = 'Sheet',
-    apiUrl = 'http://localhost:4000/api',
+    apiUrl = '/api',
 }: ProfilerPanelProps) {
     const [profile, setProfile] = useState<SheetProfile | null>(null);
     const [isLoading, setIsLoading] = useState(false);

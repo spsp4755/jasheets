@@ -1,0 +1,31 @@
+# Ingress — 브라우저 기준 단일 오리진:
+#   /socket.io → api (WebSocket 실시간 협업)
+#   /api       → api (HTTP, Next 프록시를 거치지 않는 직행 경로)
+#   /          → web
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: jasheets
+  namespace: jasheets
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600" # WebSocket 유지
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m" # xlsx 업로드
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: jasheets.local # 폐쇄망 내부 DNS/호스트에 맞게 변경
+      http:
+        paths:
+          - path: /socket.io
+            pathType: Prefix
+            backend:
+              service: { name: api, port: { number: 4000 } }
+          - path: /api
+            pathType: Prefix
+            backend:
+              service: { name: api, port: { number: 4000 } }
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: web, port: { number: 3000 } }

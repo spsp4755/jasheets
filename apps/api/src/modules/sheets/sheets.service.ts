@@ -414,8 +414,17 @@ export class SheetsService {
     );
 
     // Perform the updates
-    const result = await this.prisma.$transaction(
-      updates.map((update) =>
+    // value가 null이고 formula/format도 없으면 "지워진 셀" — 행을 삭제해야 새로고침 시 되살아나지 않는다
+    const cleared = updates.filter(u => u.value === null && !u.formula && !u.format);
+    const upserts = updates.filter(u => !(u.value === null && !u.formula && !u.format));
+
+    const result = await this.prisma.$transaction([
+      ...(cleared.length > 0
+        ? [this.prisma.cell.deleteMany({
+            where: { sheetId, OR: cleared.map(u => ({ row: u.row, col: u.col })) },
+          })]
+        : []),
+      ...upserts.map((update) =>
         this.prisma.cell.upsert({
           where: {
             sheetId_row_col: { sheetId, row: update.row, col: update.col },
@@ -435,7 +444,7 @@ export class SheetsService {
           },
         }),
       ),
-    );
+    ]);
 
     // Trigger cell change events (async, don't block response)
     const cellChangeEvents: CellChangeEvent[] = updates.map(update => ({

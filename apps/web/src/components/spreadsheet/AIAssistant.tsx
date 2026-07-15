@@ -26,7 +26,7 @@ export default function AIAssistant({
   onFormulaInsert,
   selectedRange,
   sheetName,
-  apiUrl = 'http://localhost:4000/api',
+  apiUrl = '/api',
 }: AIAssistantProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [prompt, setPrompt] = useState('');

@@ -42,7 +42,7 @@ export const UserSpreadsheetList = ({ onSelect }: UserSpreadsheetListProps) => {
   };
 
   const handleCreate = async () => {
-    const name = prompt('Enter spreadsheet name:', 'Untitled Spreadsheet');
+    const name = prompt('스프레드시트 이름:', '제목 없는 스프레드시트');
     if (!name) return;
     try {
         const newSheet = await api.spreadsheets.create({ name });
@@ -96,7 +96,7 @@ export const UserSpreadsheetList = ({ onSelect }: UserSpreadsheetListProps) => {
             <div className="relative flex-1 md:w-64">
                 <input 
                     type="text" 
-                    placeholder="Search spreadsheets..." 
+                    placeholder="스프레드시트 검색..." 
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -109,7 +109,7 @@ export const UserSpreadsheetList = ({ onSelect }: UserSpreadsheetListProps) => {
                 onClick={handleCreate}
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
             >
-                New Spreadsheet
+                새 스프레드시트
             </button>
         </div>
       </div>

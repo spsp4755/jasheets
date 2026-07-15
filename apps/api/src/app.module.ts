@@ -11,7 +11,6 @@ import { AIModule } from './modules/ai/ai.module';
 import { CommentsModule } from './modules/comments/comments.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
-import { OAuthModule } from './modules/oauth/oauth.module';
 import { UsersModule } from './modules/users/users.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { SettingsModule } from './modules/settings/settings.module';
@@ -55,7 +54,6 @@ import { APIUsageModule } from './modules/api-usage/api-usage.module';
     }),
     PrismaModule,
     AuthModule,
-    OAuthModule,
     SheetsModule,
     CollaborationModule,
     VersioningModule,

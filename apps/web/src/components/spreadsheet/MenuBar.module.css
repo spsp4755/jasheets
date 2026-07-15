@@ -1,42 +1,75 @@
 
+/* Google Sheets 스타일 2단 헤더: 제목 행 + 메뉴 행 */
 .container {
   display: flex;
   align-items: center;
-  padding: 0 16px;
-  height: 64px; 
+  padding: 4px 16px 0 12px;
+  height: 64px;
   background: #fff;
-  border-bottom: 1px solid #e0e0e0;
-  gap: 16px;
+  gap: 8px;
 }
 
-.leftSection {
-    display: flex;
-    align-items: center;
-    gap: 12px;
+.headerColumn {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
 }
 
-.titleContainer {
-    display: flex;
-    flex-direction: column;
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.star {
+  color: #444746;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 50%;
+}
+.star:hover {
+  background: #f1f3f4;
+}
+
+.rightSection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.shareButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #c2e7ff;
+  color: #001d35;
+  border: none;
+  border-radius: 24px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.shareButton:hover {
+  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.3);
 }
 
 .titleInput {
     border: none;
     font-size: 18px;
-    font-weight: 500;
-    color: #202124; 
-    padding: 4px 8px;
+    color: #202124;
+    padding: 2px 6px;
     border-radius: 4px;
     outline: none;
     min-width: 200px;
 }
 .titleInput:hover {
-    border: 1px solid #dadce0;
-    padding: 3px 7px;
+    outline: 1px solid #dadce0;
 }
 .titleInput:focus {
-    border: 2px solid #1a73e8;
-    padding: 2px 6px;
+    outline: 2px solid #1a73e8;
 }
 
 .logo {
@@ -66,7 +99,7 @@
   background: none;
   border: none;
   border-radius: 4px;
-  padding: 4px 8px;
+  padding: 2px 8px;
   font-size: 14px;
   color: #202124;
   cursor: pointer;
@@ -75,8 +108,7 @@
 
 .menuButton:hover,
 .menuButton.active {
-  background-color: #e8f0fe;
-  color: #1a73e8; /* Google Blueish */
+  background-color: #f1f3f4;
 }
 
 .dropdown {

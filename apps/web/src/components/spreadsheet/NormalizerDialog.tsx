@@ -32,7 +32,7 @@ export default function NormalizerDialog({
     onClose,
     onApply,
     data,
-    apiUrl = 'http://localhost:4000/api',
+    apiUrl = '/api',
 }: NormalizerDialogProps) {
     const [options, setOptions] = useState({
         normalizeDate: true,

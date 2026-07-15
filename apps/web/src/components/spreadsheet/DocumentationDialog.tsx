@@ -36,7 +36,7 @@ export default function DocumentationDialog({
     data,
     headers,
     sheetName = 'Sheet',
-    apiUrl = 'http://localhost:4000/api',
+    apiUrl = '/api',
 }: DocumentationDialogProps) {
     const [result, setResult] = useState<DocumentationResult | null>(null);
     const [isLoading, setIsLoading] = useState(false);
