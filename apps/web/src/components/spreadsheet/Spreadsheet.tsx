@@ -28,6 +28,7 @@ import Toast from '../ui/Toast';
 import ShareDialog from './ShareDialog';
 import HeaderContextMenu from './HeaderContextMenu';
 import CellContextMenu from './CellContextMenu';
+import { computeFillUpdates } from '@/utils/fillHandle';
 import {
   CellPosition,
   CellRange,
@@ -108,6 +109,7 @@ export default function Spreadsheet({ initialData = {}, initialCharts = [], onDa
     data,
     setData,
     updateData,
+    applyChange,
     setCellValue,
     updateCellStyle,
     insertRow,
@@ -659,6 +661,86 @@ export default function Spreadsheet({ initialData = {}, initialCharts = [], onDa
     _handleSelectionChange(range);
   }, [_handleSelectionChange]);
 
+  const handleFillRange = useCallback((source: CellRange, target: CellRange) => {
+    const direction = target.end.row > source.end.row ? 'down' : 'right';
+    const updates = computeFillUpdates(data, source, target, direction);
+    if (updates.length > 0) updateCells(updates);
+    setSelection(target);
+    handleCellSelect(target.end);
+  }, [data, updateCells, setSelection, handleCellSelect]);
+
+  const handleMergeCells = useCallback(() => {
+    if (!selection) return;
+    const { start, end } = selection;
+    if (start.row === end.row && start.col === end.col) return; // 병합할 범위가 없음
+    applyChange((draft) => {
+      if (!draft[start.row]) draft[start.row] = {};
+      draft[start.row][start.col] = {
+        ...draft[start.row][start.col],
+        style: {
+          ...draft[start.row][start.col]?.style,
+          mergeRows: end.row - start.row + 1,
+          mergeCols: end.col - start.col + 1,
+        },
+      };
+      // 병합에 덮이는 나머지 셀은 내용을 비움 (Google Sheets와 동일하게 데이터 손실 발생)
+      for (let r = start.row; r <= end.row; r++) {
+        for (let c = start.col; c <= end.col; c++) {
+          if (r === start.row && c === start.col) continue;
+          if (draft[r]?.[c]) delete draft[r][c];
+        }
+      }
+    });
+    setSelection({ start, end: start });
+    handleCellSelect(start);
+  }, [selection, applyChange, setSelection, handleCellSelect]);
+
+  const handleUnmergeCells = useCallback(() => {
+    if (!selectedCell) return;
+    const anchor = data[selectedCell.row]?.[selectedCell.col];
+    if (!anchor?.style?.mergeRows && !anchor?.style?.mergeCols) return;
+    applyChange((draft) => {
+      const style = { ...draft[selectedCell.row][selectedCell.col].style };
+      delete style.mergeRows;
+      delete style.mergeCols;
+      draft[selectedCell.row][selectedCell.col] = { ...draft[selectedCell.row][selectedCell.col], style };
+    });
+  }, [selectedCell, data, applyChange]);
+
+  const BORDER_LINE = { width: 1, color: '#424242' };
+
+  const handleSetBorders = useCallback((mode: 'all' | 'outer' | 'none') => {
+    if (!selection) return;
+    const { start, end } = selection;
+    applyChange((draft) => {
+      for (let r = start.row; r <= end.row; r++) {
+        for (let c = start.col; c <= end.col; c++) {
+          if (!draft[r]) draft[r] = {};
+          const prevStyle = draft[r][c]?.style ?? {};
+          const style = { ...prevStyle };
+          if (mode === 'none') {
+            delete style.borderTop;
+            delete style.borderRight;
+            delete style.borderBottom;
+            delete style.borderLeft;
+          } else if (mode === 'all') {
+            style.borderTop = BORDER_LINE;
+            style.borderRight = BORDER_LINE;
+            style.borderBottom = BORDER_LINE;
+            style.borderLeft = BORDER_LINE;
+          } else {
+            // outer: 선택 범위의 바깥쪽 테두리만
+            if (r === start.row) style.borderTop = BORDER_LINE; else delete style.borderTop;
+            if (r === end.row) style.borderBottom = BORDER_LINE; else delete style.borderBottom;
+            if (c === start.col) style.borderLeft = BORDER_LINE; else delete style.borderLeft;
+            if (c === end.col) style.borderRight = BORDER_LINE; else delete style.borderRight;
+          }
+          draft[r][c] = { ...(draft[r][c] ?? { value: null }), style };
+        }
+      }
+    });
+  }, [selection, applyChange]);
+
   // Keyboard Navigation
   useKeyboardNavigation({
     selectedCell,
@@ -673,15 +755,15 @@ export default function Spreadsheet({ initialData = {}, initialCharts = [], onDa
     },
     onClearSelection: () => {
       if (!selection) return;
-      const newData = { ...data };
-      for (let row = selection.start.row; row <= selection.end.row; row++) {
-        for (let col = selection.start.col; col <= selection.end.col; col++) {
-          if (newData[row]?.[col]) {
-            newData[row][col] = { value: null, style: newData[row][col].style };
+      applyChange((draft) => {
+        for (let row = selection.start.row; row <= selection.end.row; row++) {
+          for (let col = selection.start.col; col <= selection.end.col; col++) {
+            if (draft[row]?.[col]) {
+              draft[row][col] = { value: null, style: draft[row][col].style };
+            }
           }
         }
-      }
-      updateData(newData);
+      });
     },
     totalRows: DEFAULT_CONFIG.totalRows,
     totalCols: DEFAULT_CONFIG.totalCols,
@@ -1052,18 +1134,18 @@ export default function Spreadsheet({ initialData = {}, initialCharts = [], onDa
     const maxRow = usedRows.length > 0 ? Math.max(...usedRows) : -1;
     const startTargetRow = maxRow + 5;
 
-    const newData = { ...data };
-    Object.keys(pivotData).forEach(rIdx => {
-      const r = Number(rIdx);
-      const targetRow = startTargetRow + r;
-      if (!newData[targetRow]) newData[targetRow] = {};
-      Object.keys(pivotData[r]).forEach(cIdx => {
-        const c = Number(cIdx);
-        newData[targetRow][c] = pivotData[r][c];
+    applyChange((draft) => {
+      Object.keys(pivotData).forEach(rIdx => {
+        const r = Number(rIdx);
+        const targetRow = startTargetRow + r;
+        if (!draft[targetRow]) draft[targetRow] = {};
+        Object.keys(pivotData[r]).forEach(cIdx => {
+          const c = Number(cIdx);
+          draft[targetRow][c] = pivotData[r][c];
+        });
       });
     });
-    updateData(newData);
-  }, [data, updateData]);
+  }, [data, applyChange]);
 
   if (loading || !user) {
     return (
@@ -1200,6 +1282,9 @@ export default function Spreadsheet({ initialData = {}, initialCharts = [], onDa
         onFormatNumber={(fmt) => updateCellFormat(selection, fmt)}
         onTableFormat={() => setIsTableFormatOpen(true)}
         onTheme={() => setIsThemeDialogOpen(true)}
+        onMergeCells={handleMergeCells}
+        onUnmergeCells={handleUnmergeCells}
+        onSetBorders={handleSetBorders}
         onSortRangeAsc={handleSortRangeAsc}
         onSortRangeDesc={handleSortRangeDesc}
         onRemoveDuplicates={handleRemoveDuplicates}
@@ -1298,6 +1383,7 @@ export default function Spreadsheet({ initialData = {}, initialCharts = [], onDa
           showGridlines={showGridlines}
           onHeaderContextMenu={handleHeaderContextMenu}
           onCellContextMenu={(x, y) => setCellContextMenu({ x, y })}
+          onFillRange={handleFillRange}
           isEditing={isEditing}
         />
 
@@ -1537,14 +1623,14 @@ export default function Spreadsheet({ initialData = {}, initialCharts = [], onDa
         onClose={() => setIsSheetBuilderOpen(false)}
         onApply={(result) => {
           if (result.cells) {
-            const newData = { ...data };
-            result.cells.forEach((row, rIdx) => {
-              if (!newData[rIdx]) newData[rIdx] = {};
-              row.forEach((cell, cIdx) => {
-                newData[rIdx][cIdx] = { value: cell };
+            applyChange((draft) => {
+              result.cells.forEach((row, rIdx) => {
+                if (!draft[rIdx]) draft[rIdx] = {};
+                row.forEach((cell, cIdx) => {
+                  draft[rIdx][cIdx] = { value: cell };
+                });
               });
             });
-            updateData(newData);
             setToastMessage('AI 시트가 생성되었습니다.');
           }
         }}
@@ -1568,16 +1654,16 @@ export default function Spreadsheet({ initialData = {}, initialCharts = [], onDa
           if (!selection) return;
           const startRow = Math.min(selection.start.row, selection.end.row);
           const startCol = Math.min(selection.start.col, selection.end.col);
-          const newData = { ...data };
-          normalizedData.forEach((row, rIdx) => {
-            row.forEach((val, cIdx) => {
-              const r = startRow + rIdx;
-              const c = startCol + cIdx;
-              if (!newData[r]) newData[r] = {};
-              newData[r][c] = { ...newData[r]?.[c], value: val };
+          applyChange((draft) => {
+            normalizedData.forEach((row, rIdx) => {
+              row.forEach((val, cIdx) => {
+                const r = startRow + rIdx;
+                const c = startCol + cIdx;
+                if (!draft[r]) draft[r] = {};
+                draft[r][c] = { ...draft[r]?.[c], value: val };
+              });
             });
           });
-          updateData(newData);
           setToastMessage('데이터가 정규화되었습니다.');
         }}
         data={selectedData}

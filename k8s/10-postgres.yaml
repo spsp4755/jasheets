@@ -37,9 +37,11 @@ spec:
     metadata:
       labels: { app: postgres }
     spec:
+      imagePullSecrets:
+        - name: harbor-pull-secret
       containers:
         - name: postgres
-          image: postgres:16-alpine
+          image: harbor.internal/jasheets/postgres:16-alpine # Harbor로 재푸시한 이미지 (실제 주소로 변경)
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5432

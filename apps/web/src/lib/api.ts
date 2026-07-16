@@ -306,7 +306,8 @@ export const api = {
         if (res.status === 404) return null;
         throw new Error('Failed to fetch embed config');
       }
-      return res.json();
+      const text = await res.text();
+      return text ? JSON.parse(text) : null; // 임베딩 미설정 시 서버가 빈 body(null)로 응답
     },
     createEmbed: async (id: string, config: {
       enabled?: boolean;

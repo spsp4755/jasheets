@@ -49,6 +49,11 @@ export const DEFAULT_CONFIG: SpreadsheetConfig = {
   totalCols: 26,
 };
 
+export interface BorderLine {
+  width: number;
+  color: string;
+}
+
 export interface CellStyle {
   backgroundColor?: string;
   color?: string;
@@ -59,6 +64,14 @@ export interface CellStyle {
   fontFamily?: string;
   textAlign?: 'left' | 'center' | 'right';
   verticalAlign?: 'top' | 'middle' | 'bottom';
+  // 병합: 병합 범위의 좌상단(anchor) 셀에만 설정. 나머지 셀은 렌더링에서 건너뜀
+  mergeRows?: number;
+  mergeCols?: number;
+  // 테두리: 각 변에 독립적으로 지정
+  borderTop?: BorderLine;
+  borderRight?: BorderLine;
+  borderBottom?: BorderLine;
+  borderLeft?: BorderLine;
 }
 
 export type CellValue = string | number | boolean | null;

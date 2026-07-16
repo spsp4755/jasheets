@@ -26,10 +26,13 @@ spec:
     metadata:
       labels: { app: keycloak }
     spec:
+      imagePullSecrets:
+        - name: harbor-pull-secret
       initContainers:
         # keycloak 데이터베이스가 없으면 생성
         - name: create-db
-          image: postgres:16-alpine
+          image: harbor.internal/jasheets/postgres:16-alpine # Harbor로 재푸시한 이미지 (실제 주소로 변경)
+          imagePullPolicy: IfNotPresent
           command:
             - sh
             - -c
@@ -43,7 +46,7 @@ spec:
                 secretKeyRef: { name: jasheets-db-secret, key: POSTGRES_PASSWORD }
       containers:
         - name: keycloak
-          image: quay.io/keycloak/keycloak:26.0
+          image: harbor.internal/jasheets/keycloak:26.0 # Harbor로 재푸시한 이미지 (실제 주소로 변경)
           imagePullPolicy: IfNotPresent
           args: ["start"]
           env:

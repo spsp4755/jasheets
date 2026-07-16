@@ -354,6 +354,7 @@ export function useSpreadsheetData({ initialData = {}, onDataChange }: UseSpread
         data,
         setData,
         updateData, // External update
+        applyChange, // Immer-safe draft mutation — use this instead of `{ ...data }` + nested writes (data rows are frozen in dev)
         setCellValue,
         updateCells,
         updateCellStyle,

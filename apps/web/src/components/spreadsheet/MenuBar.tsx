@@ -46,6 +46,9 @@ interface MenuBarProps {
   onFormatNumber?: (format: string) => void;
   onTableFormat?: () => void;
   onTheme?: () => void;
+  onMergeCells?: () => void;
+  onUnmergeCells?: () => void;
+  onSetBorders?: (mode: 'all' | 'outer' | 'none') => void;
   onSortRangeAsc?: () => void;
   onSortRangeDesc?: () => void;
   onRemoveDuplicates?: () => void;
@@ -104,6 +107,9 @@ export default function MenuBar({
   onFormatNumber,
   onTableFormat,
   onTheme,
+  onMergeCells,
+  onUnmergeCells,
+  onSetBorders,
   onSortRangeAsc,
   onSortRangeDesc,
   onRemoveDuplicates,
@@ -318,6 +324,17 @@ export default function MenuBar({
                 </div>
               </div>
               <MenuItem label="텍스트" onClick={() => onFormatNumber?.('text')} />
+              <Separator />
+              <div className={styles.submenu}>
+                <span className={styles.menuLabel}>테두리</span>
+                <div className={styles.submenuDropdown}>
+                  <MenuItem label="모든 테두리" onClick={() => onSetBorders?.('all')} />
+                  <MenuItem label="바깥쪽 테두리" onClick={() => onSetBorders?.('outer')} />
+                  <MenuItem label="테두리 없음" onClick={() => onSetBorders?.('none')} />
+                </div>
+              </div>
+              <MenuItem label="셀 병합" onClick={onMergeCells} />
+              <MenuItem label="병합 해제" onClick={onUnmergeCells} />
               <Separator />
               <MenuItem label="테이블 서식" onClick={onTableFormat} />
               <MenuItem label="조건부 서식" onClick={onConditionalFormat} />

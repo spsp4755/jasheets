@@ -32,9 +32,13 @@ interface SpreadsheetCanvasProps {
   onRowResize?: (index: number, height: number) => void;
   onHeaderContextMenu?: (x: number, y: number, type: 'row' | 'col', index: number) => void;
   onCellContextMenu?: (x: number, y: number) => void;
+  onFillRange?: (source: CellRange, target: CellRange) => void;
   showGridlines?: boolean;
   isEditing?: boolean;
 }
+
+const FILL_HANDLE_SIZE = 6;
+const FILL_HANDLE_HIT_PADDING = 3; // 실제 클릭 판정 영역은 핸들보다 조금 더 넓게
 
 export default function SpreadsheetCanvas({
   data,
@@ -51,6 +55,7 @@ export default function SpreadsheetCanvas({
   onRowResize,
   onHeaderContextMenu,
   onCellContextMenu,
+  onFillRange,
   showGridlines = true,
   isEditing = false,
 }: SpreadsheetCanvasProps) {
@@ -67,6 +72,7 @@ export default function SpreadsheetCanvas({
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectionStart, setSelectionStart] = useState<CellPosition | null>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
+  const [fillDrag, setFillDrag] = useState<{ source: CellRange; current: CellPosition } | null>(null);
 
   // Resize State
   const resizingRef = useRef<{ type: 'col' | 'row', index: number, start: number, initialSize: number } | null>(null);
@@ -74,6 +80,33 @@ export default function SpreadsheetCanvas({
   const config = useMemo(
     () => ({ ...DEFAULT_CONFIG, ...configOverride }),
     [configOverride]
+  );
+
+  // 병합 셀이 덮고 있는 (row,col) → anchor(좌상단) 위치 조회용 맵. 병합 개수가 적으므로 매번 스캔해도 무방.
+  const mergeCoverage = useMemo(() => {
+    const map = new Map<string, CellPosition>();
+    for (const rowKey of Object.keys(data)) {
+      const row = Number(rowKey);
+      for (const colKey of Object.keys(data[row])) {
+        const col = Number(colKey);
+        const style = data[row][col]?.style;
+        const rowSpan = style?.mergeRows ?? 1;
+        const colSpan = style?.mergeCols ?? 1;
+        if (rowSpan <= 1 && colSpan <= 1) continue;
+        for (let r = row; r < row + rowSpan; r++) {
+          for (let c = col; c < col + colSpan; c++) {
+            if (r === row && c === col) continue;
+            map.set(`${r}:${c}`, { row, col });
+          }
+        }
+      }
+    }
+    return map;
+  }, [data]);
+
+  const resolveMergeAnchor = useCallback(
+    (pos: CellPosition): CellPosition => mergeCoverage.get(`${pos.row}:${pos.col}`) ?? pos,
+    [mergeCoverage]
   );
 
   // Calculate column positions
@@ -101,6 +134,26 @@ export default function SpreadsheetCanvas({
     },
     [rows, config]
   );
+
+  // 채우기 핸들 위치 계산에 쓰이는, 현재 활성 범위(다중 선택 or 단일 셀)의 화면 좌표 사각형
+  const getActiveRangeRect = useCallback(
+    (range: CellRange) => {
+      const x = getColX(range.start.col) - viewport.scrollX;
+      const y = getRowY(range.start.row) - viewport.scrollY;
+      let width = 0;
+      let height = 0;
+      for (let c = range.start.col; c <= range.end.col; c++) width += columns[c]?.width ?? config.defaultColWidth;
+      for (let r = range.start.row; r <= range.end.row; r++) height += rows[r]?.height ?? config.defaultRowHeight;
+      return { x, y, width, height };
+    },
+    [getColX, getRowY, viewport, columns, rows, config]
+  );
+
+  const getEffectiveRange = useCallback((): CellRange | null => {
+    if (selection) return selection;
+    if (selectedCell) return { start: selectedCell, end: selectedCell };
+    return null;
+  }, [selection, selectedCell]);
 
   // Get cell position from mouse coordinates
   const getCellFromPoint = useCallback(
@@ -140,11 +193,11 @@ export default function SpreadsheetCanvas({
       }
 
       if (col >= 0 && row >= 0) {
-        return { row, col };
+        return resolveMergeAnchor({ row, col });
       }
       return null;
     },
-    [viewport, columns, rows, config]
+    [viewport, columns, rows, config, resolveMergeAnchor]
   );
 
   // Draw the canvas
@@ -214,7 +267,26 @@ export default function SpreadsheetCanvas({
       for (let col = startCol; col <= endCol; col++) {
         if (columns[col]?.hidden) continue;
         const colWidth = columns[col]?.width ?? config.defaultColWidth;
+
+        // 병합된 셀 중 좌상단(anchor)이 아닌 칸은 그리지 않고 다음 칸으로 (칸 폭만 더해 위치는 계속 추적)
+        if (mergeCoverage.has(`${row}:${col}`)) {
+          currentX += colWidth;
+          continue;
+        }
+
         const cellData = data[row]?.[col];
+        const rowSpan = cellData?.style?.mergeRows ?? 1;
+        const colSpan = cellData?.style?.mergeCols ?? 1;
+        let effectiveWidth = colWidth;
+        let effectiveHeight = rowHeight;
+        if (colSpan > 1) {
+          effectiveWidth = 0;
+          for (let c = col; c < col + colSpan; c++) effectiveWidth += columns[c]?.width ?? config.defaultColWidth;
+        }
+        if (rowSpan > 1) {
+          effectiveHeight = 0;
+          for (let r = row; r < row + rowSpan; r++) effectiveHeight += rows[r]?.height ?? config.defaultRowHeight;
+        }
 
         // Check if cell is in selection
         const isInSelection =
@@ -230,13 +302,13 @@ export default function SpreadsheetCanvas({
         // Draw cell background
         if (isInSelection && !isSelected) {
           ctx.fillStyle = 'rgba(26, 115, 232, 0.1)';
-          ctx.fillRect(currentX, currentY, colWidth, rowHeight);
+          ctx.fillRect(currentX, currentY, effectiveWidth, effectiveHeight);
         }
 
         // Apply cell style background
         if (cellData?.style?.backgroundColor) {
           ctx.fillStyle = cellData.style.backgroundColor;
-          ctx.fillRect(currentX, currentY, colWidth, rowHeight);
+          ctx.fillRect(currentX, currentY, effectiveWidth, effectiveHeight);
         }
 
         // Apply conditional formatting
@@ -280,14 +352,49 @@ export default function SpreadsheetCanvas({
         if (conditionalStyle.backgroundColor) {
           // @ts-ignore
           ctx.fillStyle = conditionalStyle.backgroundColor;
-          ctx.fillRect(currentX, currentY, colWidth, rowHeight);
+          ctx.fillRect(currentX, currentY, effectiveWidth, effectiveHeight);
         }
 
         // Draw cell border
         if (showGridlines) {
           ctx.strokeStyle = '#e2e2e2';
           ctx.lineWidth = 1;
-          ctx.strokeRect(currentX + 0.5, currentY + 0.5, colWidth, rowHeight);
+          ctx.strokeRect(currentX + 0.5, currentY + 0.5, effectiveWidth, effectiveHeight);
+        }
+
+        // 셀별 지정 테두리 (각 변 독립 지정, 격자선보다 위에 그려짐)
+        const border = cellData?.style;
+        if (border?.borderTop) {
+          ctx.strokeStyle = border.borderTop.color;
+          ctx.lineWidth = border.borderTop.width;
+          ctx.beginPath();
+          ctx.moveTo(currentX, currentY);
+          ctx.lineTo(currentX + effectiveWidth, currentY);
+          ctx.stroke();
+        }
+        if (border?.borderLeft) {
+          ctx.strokeStyle = border.borderLeft.color;
+          ctx.lineWidth = border.borderLeft.width;
+          ctx.beginPath();
+          ctx.moveTo(currentX, currentY);
+          ctx.lineTo(currentX, currentY + effectiveHeight);
+          ctx.stroke();
+        }
+        if (border?.borderRight) {
+          ctx.strokeStyle = border.borderRight.color;
+          ctx.lineWidth = border.borderRight.width;
+          ctx.beginPath();
+          ctx.moveTo(currentX + effectiveWidth, currentY);
+          ctx.lineTo(currentX + effectiveWidth, currentY + effectiveHeight);
+          ctx.stroke();
+        }
+        if (border?.borderBottom) {
+          ctx.strokeStyle = border.borderBottom.color;
+          ctx.lineWidth = border.borderBottom.width;
+          ctx.beginPath();
+          ctx.moveTo(currentX, currentY + effectiveHeight);
+          ctx.lineTo(currentX + effectiveWidth, currentY + effectiveHeight);
+          ctx.stroke();
         }
 
         // Draw cell content
@@ -305,9 +412,9 @@ export default function SpreadsheetCanvas({
           ctx.font = `${fontWeight === 'bold' ? 'bold ' : ''}${fontStyle === 'italic' ? 'italic ' : ''}${cellData.style?.fontSize || 13}px ${cellData.style?.fontFamily || 'Arial'}`;
 
           const textX = cellData.style?.textAlign === 'center'
-            ? currentX + colWidth / 2
+            ? currentX + effectiveWidth / 2
             : cellData.style?.textAlign === 'right'
-              ? currentX + colWidth - 4
+              ? currentX + effectiveWidth - 4
               : currentX + 4;
 
           ctx.textAlign = (cellData.style?.textAlign as CanvasTextAlign) || 'left';
@@ -316,9 +423,9 @@ export default function SpreadsheetCanvas({
           // Clip text to cell bounds
           ctx.save();
           ctx.beginPath();
-          ctx.rect(currentX + 2, currentY + 2, colWidth - 4, rowHeight - 4);
+          ctx.rect(currentX + 2, currentY + 2, effectiveWidth - 4, effectiveHeight - 4);
           ctx.clip();
-          ctx.fillText(displayValue, textX, currentY + rowHeight / 2);
+          ctx.fillText(displayValue, textX, currentY + effectiveHeight / 2);
           ctx.restore();
         }
 
@@ -331,8 +438,19 @@ export default function SpreadsheetCanvas({
     if (!isEditing && selectedCell && selectedCell.row >= startRow && selectedCell.row <= endRow && selectedCell.col >= startCol && selectedCell.col <= endCol) {
       const cellX = getColX(selectedCell.col) - scrollX;
       const cellY = getRowY(selectedCell.row) - scrollY;
-      const cellWidth = columns[selectedCell.col]?.width ?? config.defaultColWidth;
-      const cellHeight = rows[selectedCell.row]?.height ?? config.defaultRowHeight;
+      const selectedStyle = data[selectedCell.row]?.[selectedCell.col]?.style;
+      const selRowSpan = selectedStyle?.mergeRows ?? 1;
+      const selColSpan = selectedStyle?.mergeCols ?? 1;
+      let cellWidth = columns[selectedCell.col]?.width ?? config.defaultColWidth;
+      let cellHeight = rows[selectedCell.row]?.height ?? config.defaultRowHeight;
+      if (selColSpan > 1) {
+        cellWidth = 0;
+        for (let c = selectedCell.col; c < selectedCell.col + selColSpan; c++) cellWidth += columns[c]?.width ?? config.defaultColWidth;
+      }
+      if (selRowSpan > 1) {
+        cellHeight = 0;
+        for (let r = selectedCell.row; r < selectedCell.row + selRowSpan; r++) cellHeight += rows[r]?.height ?? config.defaultRowHeight;
+      }
 
       ctx.strokeStyle = '#1a73e8';
       ctx.lineWidth = 2;
@@ -361,6 +479,34 @@ export default function SpreadsheetCanvas({
       ctx.lineWidth = 1;
       ctx.setLineDash([]);
       ctx.strokeRect(selStartX + 0.5, selStartY + 0.5, selWidth, selHeight);
+
+      // 다중 셀 선택의 채우기 핸들 (단일 셀은 위쪽 selectedCell 블록에서 이미 그림)
+      ctx.fillStyle = '#1a73e8';
+      ctx.fillRect(selStartX + selWidth - FILL_HANDLE_SIZE / 2, selStartY + selHeight - FILL_HANDLE_SIZE / 2, FILL_HANDLE_SIZE, FILL_HANDLE_SIZE);
+    }
+
+    // 채우기 핸들 드래그 중 미리보기 (점선 사각형)
+    if (fillDrag) {
+      const target =
+        fillDrag.current.row > fillDrag.source.end.row
+          ? { start: fillDrag.source.start, end: { row: fillDrag.current.row, col: fillDrag.source.end.col } }
+          : fillDrag.current.col > fillDrag.source.end.col
+            ? { start: fillDrag.source.start, end: { row: fillDrag.source.end.row, col: fillDrag.current.col } }
+            : null;
+      if (target) {
+        const px = getColX(target.start.col) - scrollX;
+        const py = getRowY(target.start.row) - scrollY;
+        let pw = 0;
+        let ph = 0;
+        for (let c = target.start.col; c <= target.end.col; c++) pw += columns[c]?.width ?? config.defaultColWidth;
+        for (let r = target.start.row; r <= target.end.row; r++) ph += rows[r]?.height ?? config.defaultRowHeight;
+
+        ctx.strokeStyle = '#1a73e8';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 3]);
+        ctx.strokeRect(px + 0.5, py + 0.5, pw, ph);
+        ctx.setLineDash([]);
+      }
     }
 
     ctx.restore();
@@ -437,6 +583,8 @@ export default function SpreadsheetCanvas({
     getRowY,
     showGridlines,
     isEditing,
+    fillDrag,
+    mergeCoverage,
   ]);
 
   // Handle resize
@@ -482,6 +630,18 @@ export default function SpreadsheetCanvas({
       const rect = canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
+
+      // 채우기 핸들 드래그 시작 판정 (활성 범위 우하단 모서리 근처 클릭)
+      const activeRange = getEffectiveRange();
+      if (activeRange) {
+        const r = getActiveRangeRect(activeRange);
+        const hx = r.x + r.width;
+        const hy = r.y + r.height;
+        if (Math.abs(x - hx) <= FILL_HANDLE_SIZE + FILL_HANDLE_HIT_PADDING && Math.abs(y - hy) <= FILL_HANDLE_SIZE + FILL_HANDLE_HIT_PADDING) {
+          setFillDrag({ source: activeRange, current: activeRange.end });
+          return;
+        }
+      }
 
       // Check for structural resize (Headers)
       if (y < config.headerHeight && x > config.headerWidth) {
@@ -569,7 +729,7 @@ export default function SpreadsheetCanvas({
         }
       }
     },
-    [getCellFromPoint, onCellSelect, onSelectionChange, config, columns, rows, viewport, canvasSize]
+    [getCellFromPoint, onCellSelect, onSelectionChange, config, columns, rows, viewport, canvasSize, getEffectiveRange, getActiveRangeRect]
   );
 
   // Handle mouse move
@@ -581,6 +741,13 @@ export default function SpreadsheetCanvas({
       const rect = canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
+
+      // 채우기 핸들 드래그 중이면 미리보기 범위만 갱신
+      if (fillDrag) {
+        const cell = getCellFromPoint(x, y);
+        if (cell) setFillDrag((prev) => (prev ? { ...prev, current: cell } : prev));
+        return;
+      }
 
       // Handle Resize
       if (resizingRef.current) {
@@ -650,15 +817,26 @@ export default function SpreadsheetCanvas({
       rows,
       selectionStart,
       viewport,
+      fillDrag,
     ]
   );
 
   // Handle mouse up
   const handleMouseUp = useCallback(() => {
+    if (fillDrag) {
+      const { source, current } = fillDrag;
+      // v1: 아래로 또는 오른쪽으로만 확장 지원 (위/왼쪽 확장은 스킵)
+      if (current.row > source.end.row) {
+        onFillRange?.(source, { start: source.start, end: { row: current.row, col: source.end.col } });
+      } else if (current.col > source.end.col) {
+        onFillRange?.(source, { start: source.start, end: { row: source.end.row, col: current.col } });
+      }
+      setFillDrag(null);
+    }
     setIsSelecting(false);
     setSelectionStart(null);
     resizingRef.current = null;
-  }, []);
+  }, [fillDrag, onFillRange]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault();

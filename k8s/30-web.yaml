@@ -12,9 +12,11 @@ spec:
     metadata:
       labels: { app: web }
     spec:
+      imagePullSecrets:
+        - name: harbor-pull-secret
       containers:
         - name: web
-          image: jasheets/web:latest
+          image: harbor.internal/jasheets/web:0.2.0 # 실제 Harbor 주소/프로젝트로 변경
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000

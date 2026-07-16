@@ -42,16 +42,18 @@ spec:
     metadata:
       labels: { app: api }
     spec:
+      imagePullSecrets:
+        - name: harbor-pull-secret
       initContainers:
         - name: migrate
-          image: jasheets/api:latest
+          image: harbor.internal/jasheets/api:0.2.0 # 실제 Harbor 주소/프로젝트로 변경
           imagePullPolicy: IfNotPresent
           command: ["npx", "prisma", "migrate", "deploy"]
           envFrom:
             - secretRef: { name: jasheets-api-secret }
       containers:
         - name: api
-          image: jasheets/api:latest
+          image: harbor.internal/jasheets/api:0.2.0 # 실제 Harbor 주소/프로젝트로 변경
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 4000
