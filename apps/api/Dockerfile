@@ -4,7 +4,7 @@ FROM node:22.23.4-alpine AS builder
 WORKDIR /app
 
 # Install pnpm
-RUN npm install -g pnpm
+RUN npm install -g pnpm@9.14.4
 
 # Copy package files
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
@@ -31,6 +31,10 @@ RUN cd apps/api && npx prisma generate
 # Build the API
 RUN pnpm --filter api build
 
+# Self-contained node_modules: pnpm symlinks point into /app/node_modules/.pnpm, which the runner stage lacks.
+# Keeps devDeps so the k8s initContainer can run `npx prisma migrate deploy`.
+RUN pnpm --filter api deploy /out && cd /out && npx prisma generate
+
 # Production stage
 FROM node:22.23.4-alpine AS runner
 
@@ -44,7 +48,7 @@ RUN adduser --system --uid 1001 nestjs
 
 # Copy built assets
 COPY --from=builder /app/apps/api/dist ./dist
-COPY --from=builder /app/apps/api/node_modules ./node_modules
+COPY --from=builder /out/node_modules ./node_modules
 COPY --from=builder /app/apps/api/package.json ./
 COPY --from=builder /app/apps/api/prisma ./prisma
 
@@ -54,4 +58,4 @@ EXPOSE 4000
 
 ENV PORT=4000
 
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/src/main.js"]
