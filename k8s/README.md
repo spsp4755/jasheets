@@ -18,8 +18,8 @@ podman load → 사내 Harbor에 push → k8s가 Harbor에서 pull**.
 ## 1. 이미지 빌드 (인터넷 가능한 PC에서)
 
 ```bash
-podman build -f apps/api/Dockerfile -t jasheets/api:0.2.0 .
-podman build -f apps/web/Dockerfile -t jasheets/web:0.2.0 .
+podman build -f apps/api/Dockerfile -t jasheets/api:0.2.1 .
+podman build -f apps/web/Dockerfile -t jasheets/web:0.2.1 .
 podman pull docker.io/library/postgres:16-alpine
 podman tag docker.io/library/postgres:16-alpine jasheets/postgres:16-alpine
 podman pull quay.io/keycloak/keycloak:26.0        # Keycloak SSO 쓸 경우만
@@ -30,11 +30,11 @@ podman tag quay.io/keycloak/keycloak:26.0 jasheets/keycloak:26.0
 
 ```bash
 # 인터넷 PC에서 저장
-podman save -o jasheets-images-v0.2.0.tar.gz \
-  jasheets/api:0.2.0 jasheets/web:0.2.0 jasheets/postgres:16-alpine jasheets/keycloak:26.0
+podman save -o jasheets-images-v0.2.1.tar.gz \
+  jasheets/api:0.2.1 jasheets/web:0.2.1 jasheets/postgres:16-alpine jasheets/keycloak:26.0
 
 # tar를 폐쇄망 반입 매체(USB 등)로 옮긴 뒤, 폐쇄망 안에서:
-podman load -i jasheets-images-v0.2.0.tar.gz
+podman load -i jasheets-images-v0.2.1.tar.gz
 ```
 
 ## 3. 사내 Harbor로 push
@@ -44,7 +44,7 @@ podman load -i jasheets-images-v0.2.0.tar.gz
 podman login harbor.internal
 
 # 실제 Harbor 주소로 태그 후 push (harbor.internal → 실제 값으로 변경)
-for img in api:0.2.0 web:0.2.0 postgres:16-alpine keycloak:26.0; do
+for img in api:0.2.1 web:0.2.1 postgres:16-alpine keycloak:26.0; do
   podman tag jasheets/$img harbor.internal/jasheets/$img
   podman push harbor.internal/jasheets/$img
 done
